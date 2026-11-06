@@ -10,7 +10,7 @@ Edge Function `vpnir-api` is deployed at:
 The function implements Telegram-code login verification, order creation, discount preview and the user's order list. The login code is issued by the Telegram bot, expires after five minutes, and is single-use. The browser keeps the opaque session token in sessionStorage; only its SHA-256 hash is stored in the database.
 
 ## Website
-Static frontend is in `web/`. It can be deployed to Netlify with the publish directory set to `web`. The frontend uses the Edge Function above. It does not contain a service-role key.
+Static frontend is in `web/`. It can be deployed to Netlify with the publish directory set to `web`. The frontend uses the Edge Function above. It does not contain a service-role key. The customer panel is at `/` and the Telegram-admin panel is at `/admin.html`. Admin access is checked server-side against the configured administrator Telegram ID; discounts are shared in Supabase between the website and bot.
 
 ## Telegram bot
 Run `bot/main.py` on one persistent worker (Railway is one option). Set these host secrets:
@@ -25,5 +25,5 @@ The bot needs to be started by the user before it can send that user direct mess
 ## Current limitations
 - A real bot username/deep link has not been supplied, so the website tells customers to open the bot and press Start without an automatic bot link.
 - Payment receipts and online payment processing are not connected. Orders remain subject to manual review; the UI must not claim payment was verified.
-- Premium pricing/quotation workflow and full admin dashboard are not implemented yet.
+- The admin page currently lists orders and manages discount codes; order approve/reject is handled in the Telegram bot. Premium quotation, receipt uploads, payments, gift catalog management and advanced analytics are not implemented yet.
 - Do not treat the service as production-ready until end-to-end tests are complete.
