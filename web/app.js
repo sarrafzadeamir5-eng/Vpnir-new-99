@@ -49,5 +49,5 @@ async function loadOrders(){
  for(const o of r.orders){const item=document.createElement("div");item.className="order-item";const left=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small"),status=document.createElement("span");name.textContent=labels[o.service]||o.service;meta.textContent="پیگیری: "+o.tracking_code+" · "+toman(o.amount_toman);status.className="status";status.textContent=({pending:"در انتظار بررسی",awaiting_payment:"در انتظار پرداخت",approved:"تأیید شده",rejected:"رد شده",cancelled:"لغو شده",quoted:"قیمت اعلام شده",awaiting_customer:"در انتظار پاسخ شما"})[o.status]||o.status;left.append(name,meta);item.append(left,status);list.append(item);}
  }catch(e){$("ordersList").textContent="دریافت سوابق ممکن نشد.";}
 }
-$("refreshBtn").addEventListener("click",loadOrders);$("logoutBtn").addEventListener("click",()=>{token="";sessionStorage.removeItem(tokenKey);showDashboard(false);});
+$("refreshBtn").addEventListener("click",loadOrders);$("logoutBtn").addEventListener("click",async()=>{try{await callApi("logout");}catch(e){}token="";sessionStorage.removeItem(tokenKey);showDashboard(false);});
 if(token){showDashboard(true);loadOrders();}else{showDashboard(false);}updateQuantity();
