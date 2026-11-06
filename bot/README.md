@@ -6,7 +6,7 @@
 - Polling for website orders and sending the order details to the configured admin.
 - Admin-only approve/reject buttons for orders awaiting review/payment confirmation.
 - Customer notification after an admin decision.
-- Manual daily report with `/report` (Tehran calendar day).
+- Automatic daily report at 21:00 Tehran time, plus the manual `/report` command.
 
 ## Setup
 1. Use Python 3.11 or newer.
@@ -19,7 +19,7 @@
    - `SUPPORT_USERNAME` (default: `Vpn_IRan1400`)
    - `ORDER_POLL_SECONDS` (optional; default: 12)
    - `TIMEZONE` (optional; default: `Asia/Tehran`)
-4. Apply migrations in order, including `0003_bot_admin_workflow.sql`.
+4. Apply the verified base schema first, then migrations `0002`, `0003` and `0004` in order. The repository currently does not include the original `0001` base schema; inspect the existing Supabase project and reconcile it before applying migrations.
 5. Start with `python main.py` on a persistent worker.
 
 ## Important
