@@ -23,7 +23,7 @@ Run `bot/main.py` on one persistent worker (Railway is one option). Set these ho
 The bot needs to be started by the user before it can send that user direct messages. Run one worker instance to avoid duplicate polling. The bot has not yet been deployed or tested against a live Telegram token.
 
 ## Current limitations
-- A real bot username/deep link has not been supplied, so the website tells customers to open the bot and press Start without an automatic bot link.
+- Bot deep link: https://t.me/Vpn_IRan140bot. Customers must press Start before the bot can DM them.
 - Payment receipts and online payment processing are not connected. Orders remain subject to manual review; the UI must not claim payment was verified.
 - The admin page currently lists orders and manages discount codes; order approve/reject is handled in the Telegram bot. Premium quotation, receipt uploads, payments, gift catalog management and advanced analytics are not implemented yet.
 - Do not treat the service as production-ready until end-to-end tests are complete.
