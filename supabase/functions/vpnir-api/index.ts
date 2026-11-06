@@ -104,7 +104,31 @@ Deno.serve(async (req: Request) => {
       return response({ ok: true, orders: result ?? [] });
     }
 
-    if (action === "logout") {
+    if (["admin_orders","admin_discounts","admin_save_discount","admin_toggle_discount"].includes(action)) {
+      const allowed = await rpc("is_admin_session", { p_session_hash: sessionHash });
+      if (!allowed) return response({ error: "forbidden" }, 403);
+      if (action === "admin_orders") return response({ ok: true, orders: await rpc("admin_list_orders", { p_session_hash: sessionHash }) ?? [] });
+      if (action === "admin_discounts") return response({ ok: true, discounts: await rpc("admin_list_discounts", { p_session_hash: sessionHash }) ?? [] });
+      if (action === "admin_save_discount") {
+        const value = Number(body.discount_value);
+        const minOrder = Number(body.min_order_toman ?? 0);
+        const usageLimit = body.usage_limit === null || body.usage_limit === "" ? null : Number(body.usage_limit);
+        const services = Array.isArray(body.services) ? body.services.map(String) : [];
+        if (!Number.isInteger(value) || !Number.isInteger(minOrder) || (usageLimit !== null && !Number.isInteger(usageLimit))) return response({ error: "invalid_discount_data" }, 400);
+        const id = await rpc("admin_save_discount", {
+          p_session_hash: sessionHash, p_code: String(body.code ?? ""), p_type: String(body.discount_type ?? ""),
+          p_value: value, p_active: body.active !== false,
+          p_starts_at: body.starts_at || null, p_ends_at: body.ends_at || null,
+          p_min_order: minOrder, p_usage_limit: usageLimit, p_services: services
+        });
+        return response({ ok: true, id });
+      }
+      if (action === "admin_toggle_discount") {
+        await rpc("admin_toggle_discount", { p_session_hash: sessionHash, p_discount_id: String(body.discount_id), p_active: Boolean(body.active) });
+        return response({ ok: true });
+      }
+    }
+  if (action === "logout") {
       await rpc("revoke_site_session", { p_session_hash: sessionHash });
       return response({ ok: true });
     }
@@ -112,7 +136,7 @@ Deno.serve(async (req: Request) => {
     return response({ error: "unknown_action" }, 400);
   } catch (error) {
     const message = error instanceof Error ? error.message : "request_failed";
-    const safe = ["invalid_discount", "invalid_quantity", "invalid_service", "unauthorized", "rate_limited"].includes(message)
+    const safe = ["invalid_discount", "invalid_quantity", "invalid_service", "unauthorized", "rate_limited", "forbidden", "invalid_discount_data"].includes(message)
       ? message : "request_failed";
     return response({ error: safe }, 400);
   }
