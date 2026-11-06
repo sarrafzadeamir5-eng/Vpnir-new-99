@@ -144,10 +144,10 @@ async function handleCallback(env, call) {
       show_alert: true,
     });
   }
-  const match = /^order:(approve|reject):([0-9a-f-]+)$/i.exec(call.data || "");
+  const match = /^order:(complete|reject):([0-9a-f-]+)$/i.exec(call.data || "");
   if (!match) return telegram(env, "answerCallbackQuery", { callback_query_id: call.id, text: "درخواست نامعتبر است." });
   const [, action, orderId] = match;
-  const status = action === "approve" ? "approved" : "rejected";
+  const status = action === "complete" ? "approved" : "rejected";
   const rows = await db(env,
     "orders?id=eq." + encodeURIComponent(orderId) +
     "&status=in.(awaiting_payment,pending)&select=id,user_id,tracking_code,status",
@@ -170,16 +170,16 @@ async function handleCallback(env, call) {
       details: { via: "telegram_admin_bot" },
     }),
   });
-  const users = await db(env, "app_users? id=eq." + encodeURIComponent(order.user_id) + "&select=telegram_id".replace("? ", "?"));
+  const users = await db(env, "app_users?id=eq." + encodeURIComponent(order.user_id) + "&select=telegram_id");
   if (users?.[0]?.telegram_id) {
     await send(env, users[0].telegram_id,
       "درخواست <code>" + escapeHtml(order.tracking_code || orderId) + "</code> " +
-      (status === "approved" ? "تأیید شد ✅" : "رد شد ❌")
+      (status === "approved" ? "تحویل سفارش انجام شد ✅" : "درخواست شما رد شد ❌")
     );
   }
   await telegram(env, "answerCallbackQuery", {
     callback_query_id: call.id,
-    text: status === "approved" ? "تأیید شد" : "رد شد",
+    text: status === "approved" ? "تحویل انجام شد و به مشتری اطلاع داده شد" : "درخواست رد شد و به مشتری اطلاع داده شد",
   });
   await telegram(env, "editMessageReplyMarkup", {
     chat_id: call.message.chat.id,
@@ -218,7 +218,7 @@ async function notifyOrders(env) {
       "وضعیت: " + escapeHtml(order.status) + "\n" +
       "توضیحات: " + note;
     const buttons = order.service === "premium" ? [] : [[
-      { text: "✅ تأیید", callback_data: "order:approve:" + order.id },
+      { text: "✅ تحویل انجام شد", callback_data: "order:complete:" + order.id },
       { text: "❌ رد", callback_data: "order:reject:" + order.id },
     ]];
     if (order.service === "premium") {
@@ -288,7 +288,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (request.method === "GET" && url.pathname === "/") {
-        return json({ service: "VPNIR Telegram webhook", status: "ok" });
+        return json({ service: "VPN IR Telegram webhook", status: "ok" });
       }
       if (request.method === "POST" && url.pathname === "/telegram/webhook") {
         const secret = request.headers.get("X-Telegram-Bot-Api-Secret-Token");
