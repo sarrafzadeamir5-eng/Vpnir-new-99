@@ -232,13 +232,13 @@ def daily_report_text():
     telegram = sum(1 for r in rows if r.get("source") == "telegram")
     sales = sum(int(r.get("amount_toman") or 0) for r in approved)
     return (
-        "📊 <b>گزارش روزانه VPN IR</b>\\n"
-        f"تاریخ: {today}\\n"
-        f"کل سفارش‌ها: {len(rows)}\\n"
-        f"سفارش سایت: {website} | سفارش ربات: {telegram}\\n"
-        f"تأییدشده: {len(approved)}\\n"
-        f"در انتظار: {len(pending)}\\n"
-        f"ردشده: {len(rejected)}\\n"
+        "📊 <b>گزارش روزانه VPN IR</b>\n"
+        f"تاریخ: {today}\n"
+        f"کل سفارش‌ها: {len(rows)}\n"
+        f"سفارش سایت: {website} | سفارش ربات: {telegram}\n"
+        f"تأییدشده: {len(approved)}\n"
+        f"در انتظار: {len(pending)}\n"
+        f"ردشده: {len(rejected)}\n"
         f"فروش سفارش‌های تأییدشده: {sales:,} تومان"
     )
 
