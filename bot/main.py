@@ -216,36 +216,67 @@ def handle_order_action(call):
         log.exception("Admin order action failed")
         bot.answer_callback_query(call.id, "خطا در ثبت تغییر وضعیت.", show_alert=True)
 
+def daily_report_text():
+    today = datetime.now(TEHRAN).date().isoformat()
+    rows = (
+        db.table("orders")
+        .select("status,amount_toman,source,created_at")
+        .gte("created_at", f"{today}T00:00:00+03:30")
+        .lt("created_at", f"{today}T23:59:59+03:30")
+        .execute()
+    ).data or []
+    approved = [r for r in rows if r.get("status") == "approved"]
+    pending = [r for r in rows if r.get("status") in {"pending", "awaiting_payment"}]
+    rejected = [r for r in rows if r.get("status") == "rejected"]
+    website = sum(1 for r in rows if r.get("source") == "website")
+    telegram = sum(1 for r in rows if r.get("source") == "telegram")
+    sales = sum(int(r.get("amount_toman") or 0) for r in approved)
+    return (
+        "📊 <b>گزارش روزانه VPN IR</b>\\n"
+        f"تاریخ: {today}\\n"
+        f"کل سفارش‌ها: {len(rows)}\\n"
+        f"سفارش سایت: {website} | سفارش ربات: {telegram}\\n"
+        f"تأییدشده: {len(approved)}\\n"
+        f"در انتظار: {len(pending)}\\n"
+        f"ردشده: {len(rejected)}\\n"
+        f"فروش سفارش‌های تأییدشده: {sales:,} تومان"
+    )
+
 @bot.message_handler(commands=["report"])
 def daily_report_command(message):
     if not is_admin(message.from_user.id):
         return
     try:
-        today = datetime.now(TEHRAN).date().isoformat()
-        rows = (
-            db.table("orders")
-            .select("status,amount_toman,created_at")
-            .gte("created_at", f"{today}T00:00:00+03:30")
-            .lt("created_at", f"{today}T23:59:59+03:30")
-            .execute()
-        ).data or []
-        total = len(rows)
-        approved = [r for r in rows if r.get("status") == "approved"]
-        pending = [r for r in rows if r.get("status") in {"pending", "awaiting_payment"}]
-        rejected = [r for r in rows if r.get("status") == "rejected"]
-        sales = sum(int(r.get("amount_toman") or 0) for r in approved)
-        bot.send_message(
-            message.chat.id,
-            "📊 <b>گزارش امروز VPN IR</b>\n"
-            f"کل سفارش‌ها: {total}\nتأییدشده: {len(approved)}\n"
-            f"در انتظار: {len(pending)}\nردشده: {len(rejected)}\n"
-            f"فروش سفارش‌های تأییدشده: {sales:,} تومان",
-        )
+        bot.send_message(message.chat.id, daily_report_text())
     except Exception:
         log.exception("Daily report failed")
         bot.send_message(message.chat.id, "گزارش فعلاً در دسترس نیست.")
 
+def scheduled_daily_report():
+    while True:
+        try:
+            now = datetime.now(TEHRAN)
+            if now.hour >= 21:
+                report_date = now.date().isoformat()
+                existing = (
+                    db.table("bot_daily_reports")
+                    .select("report_date")
+                    .eq("report_date", report_date)
+                    .maybe_single()
+                    .execute()
+                )
+                if not existing.data:
+                    bot.send_message(ADMIN_TELEGRAM_ID, daily_report_text())
+                    db.table("bot_daily_reports").insert({
+                        "report_date": report_date,
+                        "sent_at": datetime.now(timezone.utc).isoformat(),
+                    }).execute()
+        except Exception:
+            log.exception("Scheduled daily report failed")
+        time.sleep(30)
+
 if __name__ == "__main__":
     threading.Thread(target=notify_new_orders, daemon=True).start()
+    threading.Thread(target=scheduled_daily_report, daemon=True).start()
     log.info("VPN IR bot started")
     bot.infinity_polling(skip_pending=True, timeout=30, long_polling_timeout=30)
