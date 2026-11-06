@@ -161,3 +161,60 @@ grant execute on function public.verify_site_login_code(bigint,text,text) to ser
 grant execute on function public.create_site_order(text,text,integer,text,text) to service_role;
 grant execute on function public.preview_site_discount(text,text,integer,text) to service_role;
 grant all on public.admin_audit_log,public.support_tickets,public.gift_catalog,public.wallet_transactions to service_role;
+
+-- Admin RPCs are reachable only through the Edge Function using service_role.
+create or replace function public.is_admin_session(p_session_hash text)
+returns boolean language sql security definer set search_path=public,pg_temp as $$
+ select exists(select 1 from public.site_sessions s join public.app_users u on u.id=s.user_id
+  where s.token_hash=p_session_hash and s.revoked_at is null and s.expires_at>now() and u.telegram_id=8356825459);
+$$;
+create or replace function public.admin_list_orders(p_session_hash text)
+returns table(order_id uuid,tracking_code text,telegram_id bigint,service text,quantity integer,amount_toman bigint,discount_toman bigint,status text,created_at timestamptz,customer_note text)
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ if not public.is_admin_session(p_session_hash) then raise exception 'forbidden'; end if;
+ return query select o.id,o.tracking_code,u.telegram_id,o.service,o.quantity,o.amount_toman,o.discount_toman,o.status,o.created_at,o.customer_note
+ from public.orders o join public.app_users u on u.id=o.user_id order by o.created_at desc limit 200;
+end; $$;
+create or replace function public.admin_list_discounts(p_session_hash text)
+returns table(id uuid,code text,discount_type text,discount_value bigint,active boolean,starts_at timestamptz,ends_at timestamptz,min_order_toman bigint,usage_limit integer,used_count integer,applicable_services text[])
+language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ if not public.is_admin_session(p_session_hash) then raise exception 'forbidden'; end if;
+ return query select d.id,d.code,d.discount_type,d.discount_value,d.active,d.starts_at,d.ends_at,d.min_order_toman,d.usage_limit,d.used_count,d.applicable_services from public.discount_codes d order by d.created_at desc;
+end; $$;
+create or replace function public.admin_save_discount(p_session_hash text,p_code text,p_type text,p_value bigint,p_active boolean default true,p_starts_at timestamptz default null,p_ends_at timestamptz default null,p_min_order bigint default 0,p_usage_limit integer default null,p_services text[] default array['france','multi','unlimited','stars','premium']::text[])
+returns uuid language plpgsql security definer set search_path=public,pg_temp as $$
+declare v_id uuid;v_code text:=upper(trim(p_code));
+begin
+ if not public.is_admin_session(p_session_hash) then raise exception 'forbidden'; end if;
+ if length(v_code)<3 or length(v_code)>40 or p_type not in ('percent','fixed') or p_value<=0 or (p_type='percent' and p_value>100)
+ or p_min_order<0 or (p_usage_limit is not null and p_usage_limit<1) or (p_ends_at is not null and p_starts_at is not null and p_ends_at<=p_starts_at)
+ or cardinality(p_services)=0 or not(p_services <@ array['france','multi','unlimited','stars','premium']::text[]) then raise exception 'invalid_discount_data'; end if;
+ select id into v_id from public.discount_codes where upper(code)=v_code for update;
+ if v_id is null then
+  insert into public.discount_codes(code,discount_type,discount_value,active,starts_at,ends_at,min_order_toman,usage_limit,applicable_services)
+  values(v_code,p_type,p_value,p_active,p_starts_at,p_ends_at,p_min_order,p_usage_limit,p_services) returning id into v_id;
+ else
+  update public.discount_codes set discount_type=p_type,discount_value=p_value,active=p_active,starts_at=p_starts_at,ends_at=p_ends_at,min_order_toman=p_min_order,usage_limit=p_usage_limit,applicable_services=p_services where id=v_id;
+ end if;
+ insert into public.admin_audit_log(admin_telegram_id,action,entity_type,entity_id,details) values(8356825459,'save_discount','discount_code',v_id::text,jsonb_build_object('code',v_code,'type',p_type,'value',p_value));
+ return v_id;
+end; $$;
+create or replace function public.admin_toggle_discount(p_session_hash text,p_discount_id uuid,p_active boolean)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ if not public.is_admin_session(p_session_hash) then raise exception 'forbidden'; end if;
+ update public.discount_codes set active=p_active where id=p_discount_id;
+ insert into public.admin_audit_log(admin_telegram_id,action,entity_type,entity_id,details) values(8356825459,'toggle_discount','discount_code',p_discount_id::text,jsonb_build_object('active',p_active));
+end; $$;
+revoke all on function public.is_admin_session(text) from public,anon,authenticated;
+revoke all on function public.admin_list_orders(text) from public,anon,authenticated;
+revoke all on function public.admin_list_discounts(text) from public,anon,authenticated;
+revoke all on function public.admin_save_discount(text,text,text,bigint,boolean,timestamptz,timestamptz,bigint,integer,text[]) from public,anon,authenticated;
+revoke all on function public.admin_toggle_discount(text,uuid,boolean) from public,anon,authenticated;
+grant execute on function public.is_admin_session(text) to service_role;
+grant execute on function public.admin_list_orders(text) to service_role;
+grant execute on function public.admin_list_discounts(text) to service_role;
+grant execute on function public.admin_save_discount(text,text,text,bigint,boolean,timestamptz,timestamptz,bigint,integer,text[]) to service_role;
+grant execute on function public.admin_toggle_discount(text,uuid,boolean) to service_role;
