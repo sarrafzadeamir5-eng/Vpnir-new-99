@@ -12,3 +12,14 @@ begin
 end; $$;
 revoke all on function public.get_site_orders(text) from public,anon,authenticated;
 grant execute on function public.get_site_orders(text) to service_role;
+
+-- Revoke server-side sessions immediately on logout.
+create or replace function public.revoke_site_session(p_session_hash text)
+returns void language plpgsql security definer set search_path=public,pg_temp as $$
+begin
+ if p_session_hash !~ '^[a-f0-9]{64}$' then return; end if;
+ update public.site_sessions set revoked_at=now()
+ where token_hash=p_session_hash and revoked_at is null;
+end; $$;
+revoke all on function public.revoke_site_session(text) from public,anon,authenticated;
+grant execute on function public.revoke_site_session(text) to service_role;
