@@ -1,0 +1,9 @@
+name = "vpnir-telegram-bot"
+main = "src/index.js"
+compatibility_date = "2026-11-06"
+
+[triggers]
+crons = ["*/1 * * * *"]
+
+[observability]
+enabled = true
