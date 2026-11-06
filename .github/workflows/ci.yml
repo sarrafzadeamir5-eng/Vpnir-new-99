@@ -19,3 +19,5 @@ jobs:
         run: python -m py_compile bot/main.py
       - name: Check frontend JavaScript syntax
         run: node --check web/app.js
+      - name: Check Cloudflare Worker JavaScript syntax
+        run: node --check cloudflare-worker/src/index.js
