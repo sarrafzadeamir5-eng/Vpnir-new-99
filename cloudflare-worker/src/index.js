@@ -56,7 +56,7 @@ async function db(env, path, options = {}) {
       authorization: "Bearer " + c.serviceKey,
       "content-type": "application/json",
       ...(options.headers || {}),
-      ...(options.method === "POST" ? { Prefer: "return=representation" } : {}),
+      ...(["POST", "PATCH"].includes(options.method) ? { Prefer: "return=representation" } : {}),
     },
   });
   const body = await response.text();
